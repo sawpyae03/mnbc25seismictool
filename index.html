@@ -194,15 +194,9 @@
                 <div class="calc-block">
                     <h3 style="margin:0 0 10px 0; font-size: 13px; color: var(--header-blue); border-bottom: 1px solid #eee; padding-bottom: 5px; text-transform: uppercase;">System Limitations & Irregularities</h3>
                     <div class="calc-row">
-                        <div class="calc-col" style="flex: 0.35;">
-                            <span class="label">SDC</span>
-                            <select id="sdcSelect" class="value" onchange="updateSfrsUI()">
-                                <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D" selected>D</option><option value="E">E</option><option value="F">F</option>
-                            </select>
-                        </div>
                         <div class="calc-col" style="flex: 1;">
-                            <span class="label">SFRS</span>
-                            <select id="sfrsSelect" class="value" onchange="updateSfrsUI()" style="width: 100%; max-width: 220px; text-overflow: ellipsis;">
+                            <span class="label">Selected SFRS</span>
+                            <select id="sfrsSelect" class="value" onchange="updateSfrsUI()" style="width: 100%; text-overflow: ellipsis;">
                                 <option value="A">A. Bearing Wall</option><option value="B">B. Building Frame</option><option value="C" selected>C. Moment Resisting</option>
                                 <option value="D">D. Dual w/ SMRF</option><option value="E">E. Dual w/ IMRF</option><option value="F">F. Shear Wall-Frame</option>
                                 <option value="G">G. Cantilevered Col</option><option value="H">H. Steel Not Detailed</option>
@@ -585,7 +579,10 @@
 
             const sdcObj = getSDC(sds, sd1, currentS1, occCat);
             setSDCDisplay(sdcObj.sdc);
-            document.getElementById('sdcSelect').value = sdcObj.sdc;
+            
+            // SDC Select ကို ဖယ်ရှားလိုက်တဲ့အတွက် အောက်က စာကြောင်းကို ဖြုတ်ထားပါတယ်
+            // document.getElementById('sdcSelect').value = sdcObj.sdc; 
+
             updateSfrsUI(sdcObj.sdc);
             
             // Save state for PDF Report verification trace
