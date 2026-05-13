@@ -1,4 +1,4 @@
-# MNBC 2025 Seismic Hazard & Design Tool 🌍🏗️
+# MNBC 2025 Seismic Hazard & Design Tool 
 
 A web-based geospatial application designed to help structural engineers and designers calculate seismic hazard parameters and determine the **Seismic Design Category (SDC)** based on the **Myanmar National Building Code (MNBC) 2025**.
 
