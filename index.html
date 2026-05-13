@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MNBC 2025 - Seismic Hazard & Design Tool</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* ==========================================================================
+           1. CSS VARIABLES & BASE STYLES
+           ========================================================================== */
+        :root { 
+            --header-blue: #1a237e; 
+            --accent-green: #8eb359; 
+            --bg-grey: #f8f9fa; 
+            --border: #dee2e6; 
+            --white: #ffffff; 
+            --danger-red: #d32f2f;
+        }
+        body, html { 
+            margin: 0; padding: 0; height: 100%; 
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+            font-size: 14px; overflow: hidden; 
+        }
+        
+        /* ==========================================================================
+           2. WEB UI STYLES (Screen Only)
+           ========================================================================== */
+        @media screen {
+            .app-container { display: flex; flex-direction: column; height: 100vh; }
+            .top-nav { background: var(--header-blue); color: white; padding: 12px 20px; }
+            .green-divider { background: var(--accent-green); height: 5px; width: 100%; }
+            .main-layout { display: flex; flex: 1; overflow: hidden; }
+            
+            /* Sidebar Styling */
+            .sidebar { flex: 1; min-width: 420px; max-width: 480px; background: var(--white); border-right: 1px solid var(--border); z-index: 1000; display: flex; flex-direction: column; }
+            .sidebar-content { padding: 20px; flex-grow: 1; background: var(--bg-grey); overflow-y: auto; }
+            .sidebar-header { margin-bottom: 15px; border-bottom: 2px solid var(--header-blue); padding-bottom: 5px; display: flex; justify-content: space-between; align-items: center;}
+            .sidebar-header h2 { margin: 0; font-size: 18px; color: var(--header-blue); font-weight: 700; }
+            
+            /* Buttons & Cards */
+            .print-btn { background: var(--danger-red); color: white; border: none; padding: 5px 10px; border-radius: 4px; font-weight: bold; cursor: pointer; transition: 0.2s; font-size: 12px; }
+            .print-btn:hover { background: #b71c1c; }
+            .card { background: var(--white); border-radius: 4px; padding: 12px 15px; border-top: 3px solid var(--accent-green); box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 15px; }
+            .card h3 { margin: 0 0 10px 0; font-size: 12px; color: #6c757d; text-transform: uppercase; }
+            
+            /* Data Layouts */
+            .val-row { display: flex; justify-content: space-between; margin: 6px 0; align-items: center; }
+            .label { color: #495057; font-weight: 500; font-size: 13px; }
+            .value { color: var(--header-blue); font-weight: 700; font-size: 15px; }
+            .calc-block { background: var(--white); border-radius: 4px; padding: 15px; border: 1px solid var(--border); box-shadow: 0 2px 4px rgba(0,0,0,0.02); margin-bottom: 15px; }
+            .calc-row { display: flex; gap: 10px; margin-bottom: 10px; }
+            .calc-col { flex: 1; display: flex; justify-content: space-between; align-items: center; background: var(--bg-grey); padding: 8px 12px; border-radius: 4px; border: 1px solid #eaeaea; }
+            
+            /* Alerts & Highlights */
+            .alert-box { display: none; background: #ffe6e6; color: var(--danger-red); font-weight: 700; font-size: 12px; text-align: center; padding: 10px; border-radius: 4px; margin-top: 15px; border: 1px solid #ffcccc; }
+            .sdc-highlight { font-size: 18px; font-weight: 900; padding: 2px 15px; border-radius: 4px; display: inline-block; text-align: center; min-width: 30px; color: #fff; background: #ccc; transition: all 0.3s; }
+            
+            /* Tables & Tags */
+            table.custom-table { width: 100%; border-collapse: collapse; margin-top: 5px; background-color: #fff; font-size: 12px; }
+            table.custom-table th, table.custom-table td { border: 1px solid #e0e0e0; padding: 8px 10px; text-align: left; vertical-align: top; }
+            table.custom-table th { background-color: var(--bg-grey); color: var(--header-blue); font-weight: 600; text-transform: uppercase; font-size: 11px;}
+            table.custom-table tr:hover { background-color: #f1f4f5; }
+            .status-permitted { color: #27ae60; font-weight: bold; }
+            .status-penalties { color: #d35400; font-weight: bold; }
+            .status-not-permitted { color: #c0392b; font-weight: bold; }
+            .issue-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+            .issue-tag { background: #fff3cd; color: #d35400; padding: 2px 6px; border-radius: 12px; font-size: 10px; font-weight: 600; border: 1px solid #ffeeba; }
+            .issue-tag.fatal { background: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+            .no-issues { color: #7f8c8d; font-style: italic; font-size: 11px; }
+            .footer { padding: 10px; text-align: center; font-size: 12px; color: #6c757d; border-top: 1px solid var(--border); background: var(--white); }
+            
+            /* Map & UI Controls */
+            .map-wrapper { flex: 2; position: relative; height: 100%; }
+            #map { width: 100%; height: 100%; cursor: crosshair; }
+            .floating-search-bar { position: absolute; top: 20px; left: 60px; z-index: 1000; background: var(--white); border-radius: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); display: flex; align-items: center; padding: 5px 15px; width: 350px; transition: box-shadow 0.3s ease; }
+            .floating-search-bar:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+            .floating-search-input { flex: 1; border: none; outline: none; font-size: 15px; padding: 10px 5px; color: #333; background: transparent; }
+            .floating-search-btn { background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center; }
+            .floating-search-btn svg { width: 22px; height: 22px; fill: #4a7b82; transition: transform 0.2s;}
+            .floating-search-btn:hover svg { transform: scale(1.1); fill: var(--header-blue); }
+            .leaflet-popup-content-wrapper { border-radius: 4px; padding: 0; overflow: hidden; }
+            select.value { border: 1px solid #ccc; padding: 4px 6px; border-radius: 4px; outline: none; background: #fff; cursor: pointer; font-weight: bold; color: var(--header-blue); font-size: 13px;}
+            #print-area { display: none; }
+            .leaflet-control-layers { border-radius: 8px !important; border: none !important; box-shadow: 0 2px 10px rgba(0,0,0,0.2) !important; margin-top: 20px !important; margin-right: 20px !important; font-weight: 600; }
+        }
+
+        /* ==========================================================================
+           3. PRINT REPORT STYLES (PDF Output)
+           ========================================================================== */
+        @media print {
+            body, html { background: white; margin: 0; padding: 0; color: #000; font-family: 'Segoe UI', Arial, sans-serif; height: auto !important; overflow: visible !important; }
+            .app-container { display: none !important; }
+            #print-area { display: block !important; width: 100%; height: auto !important; overflow: visible !important; }
+            @page { size: A4 portrait; margin: 10mm; }
+            
+            /* Print Layout & Formatting */
+            .print-header { background-color: #1a237e !important; color: #ffffff !important; text-align: center; padding: 10px; border-radius: 4px; margin-bottom: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-header h1 { margin: 0; font-size: 14pt; text-transform: uppercase; font-weight: bold;}
+            .print-top-section { margin-bottom: 10px; }
+            .print-info-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+            .print-box { border: 1px solid #1a237e; padding: 8px 10px; border-radius: 4px; height: 100%;}
+            .print-box h3 { margin: 0 0 6px 0; font-size: 10pt; text-transform: uppercase; border-bottom: 1px solid #ddd; padding-bottom: 4px; color: #1a237e; font-weight: bold;}
+            .print-row { display: flex; justify-content: space-between; margin-bottom: 3px; font-size: 9.5pt;}
+            .print-val { font-weight: bold; color: #000;}
+            .print-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; page-break-inside: avoid; }
+            
+            /* SDC Highlight Print */
+            .print-sdc { background: #f4f5f7 !important; border: 2px solid #1a237e; text-align: center; padding: 5px; border-radius: 4px; display: flex; flex-direction: column; justify-content: center; align-items: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .print-sdc h2 { margin: 0 0 4px 0; font-size: 11pt; color: #1a237e; text-transform: uppercase; }
+            .print-sdc span { font-size: 20pt; font-weight: bold; padding: 2px 20px; border-radius: 4px; display: inline-block; -webkit-print-color-adjust: exact; print-color-adjust: exact;} 
+
+            /* Tables & Disclaimers */
+            .print-section-title { font-size: 10.5pt; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #1a237e; margin: 15px 0 6px 0; padding-bottom: 2px; color: #1a237e; page-break-after: avoid;}
+            .print-table { width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 10px; page-break-inside: auto;}
+            .print-table tr { page-break-inside: avoid; page-break-after: auto; }
+            .print-table th, .print-table td { border: 1px solid #888; padding: 4px 6px; text-align: left; vertical-align: top;}
+            .print-table th { background-color: #e8eaf6 !important; color: #1a237e !important; font-weight: bold; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+            .issue-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+            .issue-tag { background: #fff3cd !important; color: #d35400 !important; padding: 2px 6px; border-radius: 12px; font-size: 9pt; font-weight: bold; border: 1px solid #ffeeba; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+            .issue-tag.fatal { background: #f8d7da !important; color: #721c24 !important; border-color: #f5c6cb !important; }
+            .status-permitted { color: #2e7d32 !important; font-weight: bold; }
+            .status-penalties { color: #e65100 !important; font-weight: bold; }
+            .status-not-permitted { color: #c62828 !important; font-weight: bold; font-style: italic;}
+            .calc-formula { font-family: 'Courier New', Courier, monospace; font-size: 8.5pt; background: #f5f5f5 !important; padding: 6px; border: 1px dashed #999; margin-top: 6px; font-style: italic; -webkit-print-color-adjust: exact; print-color-adjust: exact;}
+            .print-disclaimer { margin-top: 20px; font-size: 8pt; font-style: italic; color: #333; text-align: justify; border-top: 2px solid #1a237e; padding-top: 8px; page-break-inside: avoid;}
+            .print-footer-time { text-align: center; font-size: 8pt; color: #222; margin-top: 5px; font-weight: bold;}
+            .verification-step { font-family: 'Courier New', monospace; font-size: 8pt; background: #f9f9f9 !important; padding: 6px; border-left: 3px solid #1a237e; margin-top: 5px; -webkit-print-color-adjust: exact; }
+            .reference-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; margin-top: 10px; }
+            .reference-table th, .reference-table td { border: 1px solid #333; padding: 4px; text-align: center; }
+            .reference-table th { background-color: #eee !important; -webkit-print-color-adjust: exact; }
+            .highlight-row { background-color: #fff9c4 !important; font-weight: bold; -webkit-print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="top-nav">
+        <h2 style="margin:0; font-weight: 400; font-size: 20px;">MNBC 2025 <span style="font-weight: 700;">SEISMIC DESIGN TOOL</span></h2>
+    </div>
+    <div class="green-divider"></div>
+
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-header">
+                    <h2>CALCULATION PANEL</h2>
+                    <button class="print-btn" onclick="generateReport()">🖨️ PDF REPORT</button>
+                </div>
+                
+                <div class="card">
+                    <h3>Site Location</h3>
+                    <div class="val-row"><span class="label">Lat</span><span id="lat" class="value">--</span></div>
+                    <div class="val-row"><span class="label">Lng</span><span id="lng" class="value">--</span></div>
+                </div>
+
+                <div class="calc-block">
+                    <h3 style="margin:0 0 10px 0; font-size: 13px; color: var(--header-blue); border-bottom: 1px solid #eee; padding-bottom: 5px; text-transform: uppercase;">Hazard & Design Parameters</h3>
+                    <div class="calc-row">
+                        <div class="calc-col"><span class="label">S<sub>s</sub></span><span id="ss-val" class="value">--</span></div>
+                        <div class="calc-col"><span class="label">S<sub>1</sub></span><span id="s1-val" class="value">--</span></div>
+                    </div>
+                    <div class="calc-row">
+                        <div class="calc-col">
+                            <span class="label">Class</span>
+                            <select id="site-class" class="value" onchange="updateCalculations()">
+                                <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D" selected>D</option><option value="E">E</option><option value="F">F</option>
+                            </select>
+                        </div>
+                        <div class="calc-col">
+                            <span class="label">Occ <span id="ie-label" style="font-size:11px; color:#d32f2f; font-weight:bold; margin-left:3px;">(I=1.0)</span></span>
+                            <select id="occ-cat" class="value" onchange="updateCalculations()">
+                                <option value="I">I</option><option value="II" selected>II</option><option value="III">III</option><option value="IV">IV</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="calc-row">
+                        <div class="calc-col"><span class="label">F<sub>a</sub></span><span id="fa-val" class="value">--</span></div>
+                        <div class="calc-col"><span class="label">F<sub>v</sub></span><span id="fv-val" class="value">--</span></div>
+                    </div>
+                    <div class="calc-row">
+                        <div class="calc-col"><span class="label">S<sub>DS</sub></span><span id="sds-val" class="value">--</span></div>
+                        <div class="calc-col"><span class="label">S<sub>D1</sub></span><span id="sd1-val" class="value">--</span></div>
+                    </div>
+                    <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #fff; border-radius: 4px; border: 1px solid var(--border);">
+                        <span class="label" style="font-size: 14px; font-weight: bold; color: #333;">Seismic Design Category</span>
+                        <span id="sdc-val" class="sdc-highlight">--</span>
+                    </div>
+                    <div id="class-f-alert" class="alert-box">Site Specific Response Spectrum Analysis required</div>
+                </div>
+
+                <div class="calc-block">
+                    <h3 style="margin:0 0 10px 0; font-size: 13px; color: var(--header-blue); border-bottom: 1px solid #eee; padding-bottom: 5px; text-transform: uppercase;">System Limitations & Irregularities</h3>
+                    <div class="calc-row">
+                        <div class="calc-col" style="flex: 0.35;">
+                            <span class="label">SDC</span>
+                            <select id="sdcSelect" class="value" onchange="updateSfrsUI()">
+                                <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D" selected>D</option><option value="E">E</option><option value="F">F</option>
+                            </select>
+                        </div>
+                        <div class="calc-col" style="flex: 1;">
+                            <span class="label">SFRS</span>
+                            <select id="sfrsSelect" class="value" onchange="updateSfrsUI()" style="width: 100%; max-width: 220px; text-overflow: ellipsis;">
+                                <option value="A">A. Bearing Wall</option><option value="B">B. Building Frame</option><option value="C" selected>C. Moment Resisting</option>
+                                <option value="D">D. Dual w/ SMRF</option><option value="E">E. Dual w/ IMRF</option><option value="F">F. Shear Wall-Frame</option>
+                                <option value="G">G. Cantilevered Col</option><option value="H">H. Steel Not Detailed</option>
+                            </select>
+                        </div>
+                    </div>
+                    <h4 style="margin: 10px 0 5px 0; font-size: 12px; color: #555;">1. Structural Irregularities to be checked</h4>
+                    <table class="custom-table">
+                        <thead><tr><th width="35%">Irregularity</th><th width="65%">Issues / Penalties</th></tr></thead>
+                        <tbody id="irregularitiesBody"></tbody>
+                    </table>
+                    <h4 style="margin: 15px 0 5px 0; font-size: 12px; color: #555;">2. SFRS Limitations</h4>
+                    <table class="custom-table">
+                        <thead><tr><th width="75%">System Type</th><th width="25%">Limit</th></tr></thead>
+                        <tbody id="sfrsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="footer">MNBC Seismic Tool Beta Version. <br> <i>sawpyae03@gmail.com</i></div>
+        </div>
+        
+        <div class="map-wrapper" id="ui-map-wrapper">
+            <div class="floating-search-bar">
+                <input type="text" id="search-coords" class="floating-search-input" placeholder="e.g. 16.8041, 96.1472" onkeypress="if(event.key === 'Enter') searchLocation()">
+                <button class="floating-search-btn" onclick="searchLocation()" title="Search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
+                </button>
+            </div>
+            <div id="map"></div>
+        </div>
+    </div>
+</div>
+
+<div id="print-area">
+    <div class="print-header"><h1>MNBC 2025 Seismic Design Tool </h1></div>
+    <div class="print-top-section">
+        <div class="print-info-panel">
+            <div class="print-box">
+                <h3>Site Information</h3>
+                <div class="print-row"><span>Latitude:</span> <span class="print-val" id="p-lat">--</span></div>
+                <div class="print-row"><span>Longitude:</span> <span class="print-val" id="p-lng">--</span></div>
+                <div class="print-row"><span>Site Class:</span> <span class="print-val" id="p-class">--</span></div>
+                <div class="print-row"><span>Occupancy:</span> <span class="print-val" id="p-occ">--</span></div>
+            </div>
+            <div class="print-box">
+                <h3>Hazard Values</h3>
+                <div class="print-row"><span>S<sub>s</sub>:</span> <span class="print-val" id="p-ss">--</span></div>
+                <div class="print-row"><span>S<sub>1</sub>:</span> <span class="print-val" id="p-s1">--</span></div>
+                <div class="print-row"><span>F<sub>a</sub>:</span> <span class="print-val" id="p-fa">--</span></div>
+                <div class="print-row"><span>F<sub>v</sub>:</span> <span class="print-val" id="p-fv">--</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="print-grid-2">
+        <div class="print-box">
+            <h3>Design Spectral Response</h3>
+            <div class="print-row"><span>S<sub>DS</sub> :</span> <span class="print-val" id="p-sds">--</span></div>
+            <div class="print-row"><span>S<sub>D1</sub> :</span> <span class="print-val" id="p-sd1">--</span></div>
+            <div class="calc-formula">S<sub>DS</sub> = (2/3) × F<sub>a</sub> × S<sub>s</sub> | S<sub>D1</sub> = (2/3) × F<sub>v</sub> × S<sub>1</sub></div>
+        </div>
+        <div class="print-sdc">
+            <h2>Final SDC</h2>
+            <span id="p-sdc">--</span>
+        </div>
+    </div>
+
+    <div class="print-box" style="margin-bottom: 10px;">
+        <h3>Detailed Interpolation Steps (Verification)</h3>
+        <div id="fa-step" class="verification-step">--</div>
+        <div id="fv-step" class="verification-step">--</div>
+    </div>
+
+    <div class="print-box" style="margin-bottom: 10px;">
+        <h3>System Limitations & Irregularities</h3>
+        <div class="print-row" style="margin-bottom: 8px;"><span>Selected SFRS:</span> <span class="print-val" id="p-sfrs">--</span></div>
+    </div>
+
+    <h4 class="print-section-title">1. Structural Irregularities to be checked</h4>
+    <table class="print-table">
+        <thead><tr><th width="35%">Irregularity</th><th width="65%">Issues / Penalties</th></tr></thead>
+        <tbody id="p-irregularitiesBody"></tbody>
+    </table>
+
+    <h4 class="print-section-title">2. SFRS Limitations</h4>
+    <table class="print-table">
+        <thead><tr><th width="75%">System Type</th><th width="25%">Limit</th></tr></thead>
+        <tbody id="p-sfrsTableBody"></tbody>
+    </table>
+
+    <div class="print-box">
+        <h3>Reference: Table 3.4.7 (SDC Selection)</h3>
+        <table class="reference-table">
+            <thead>
+                <tr><th rowspan="2">Seismicity</th><th rowspan="2">S<sub>DS</sub> Range</th><th rowspan="2">S<sub>D1</sub> Range</th><th colspan="4">Occupancy Category</th></tr>
+                <tr><th>I</th><th>II</th><th>III</th><th>IV</th></tr>
+            </thead>
+            <tbody id="ref-table-body">
+                <tr id="r-low"><td>V.Low</td><td>S<sub>DS</sub> &lt; 0.167</td><td>S<sub>D1</sub> &lt; 0.067</td><td>A</td><td>A</td><td>A</td><td>B</td></tr>
+                <tr id="r-l"><td>Low</td><td>0.167-0.33</td><td>0.067-0.133</td><td>A</td><td>A</td><td>B</td><td>C</td></tr>
+                <tr id="r-m"><td>Mod.</td><td>0.33-0.50</td><td>0.133-0.20</td><td>A</td><td>B</td><td>C</td><td>D</td></tr>
+                <tr id="r-h"><td>High</td><td>0.50-0.90</td><td>0.20-0.50</td><td>B</td><td>C</td><td>D</td><td>D</td></tr>
+                <tr id="r-s"><td>Severe</td><td>S<sub>DS</sub> ≥ 0.90</td><td>S<sub>D1</sub> ≥ 0.50</td><td>C</td><td>D</td><td>D</td><td>D</td></tr>
+                <tr id="r-e"><td>Extr.</td><td colspan="2">S<sub>1</sub> ≥ 0.75g</td><td>D</td><td>D</td><td>E</td><td>F</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="print-disclaimer">
+        <b>Disclaimer:</b> <i>The **MNBC 2025 Seismic Hazard & Design Tool** is just for information and comes "as is," so there are no guarantees that the data is always perfect or up to date. Anyone using the tool does so at their own risk and agrees that the developers and their partners aren't responsible for any issues or damages that might come up. By using this tool, users agree to clear the providers of any legal claims or liability related to the information found here.<br>
+        <i><b>User shall check Ss and S1 values from MNBC Table.</b></i>
+    </div>
+    <div class="print-footer-time" id="print-footer-time"></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+<script src="ss.js"></script>
+<script src="s1.js"></script>
+
+<script>
+    /* ==========================================================================
+       1. GLOBAL STATE & CONSTANTS
+       ========================================================================== */
+    let map, currentMarker, ssGeoData, s1GeoData;
+    let currentSs = null;
+    let currentS1 = null;
+    let currentLatLng = null;
+
+    const importanceFactors = { 'I': 1.00, 'II': 1.00, 'III': 1.25, 'IV': 1.50 };
+
+    const faHeaders = [0.25, 0.5, 0.75, 1.0, 1.25];
+    const faData = {
+        'A': [0.8, 0.8, 0.8, 0.8, 0.8], 'B': [1.0, 1.0, 1.0, 1.0, 1.0],
+        'C': [1.2, 1.2, 1.1, 1.0, 1.0], 'D': [1.6, 1.4, 1.2, 1.1, 1.0],
+        'E': [2.5, 1.7, 1.2, 0.9, 0.9]
+    };
+
+    const fvHeaders = [0.1, 0.2, 0.3, 0.4, 0.5];
+    const fvData = {
+        'A': [0.8, 0.8, 0.8, 0.8, 0.8], 'B': [1.0, 1.0, 1.0, 1.0, 1.0],
+        'C': [1.7, 1.6, 1.5, 1.4, 1.3], 'D': [2.4, 2.0, 1.8, 1.6, 1.5],
+        'E': [3.5, 3.2, 2.8, 2.4, 2.4]
+    };
+
+    const irregularitiesData = [
+        { id: 'H1a', name: 'Torsional', category: 'Horizontal', rules: { 'A': [], 'B': ['3D Model'], 'C': ['3D Model', 'Torsion Limit', 'Drift Limit'], 'DEF': ['Force Increase', 'Analysis Limit', '3D Model', 'Torsion Limit', 'Drift Limit'] } },
+        { id: 'H1b', name: 'Extreme Torsional', category: 'Horizontal', rules: { 'A': [], 'BC': ['3D Model', 'Torsion Limit', 'Drift Limit'], 'D': ['Force Increase', 'Analysis Limit', '3D Model', 'Torsion Limit', 'Drift Limit'], 'EF': ['Not Permitted'] } },
+        { id: 'H2', name: 'Reentrant Corner', category: 'Horizontal', rules: { 'ABC': [], 'DEF': ['Force Increase', 'Drift Limit'] } },
+        { id: 'H3', name: 'Diaphragm Discontinuity', category: 'Horizontal', rules: { 'ABC': [], 'DEF': ['Force Increase', 'Drift Limit'] } },
+        { id: 'H4', name: 'Out-of-Plane Offsets', category: 'Horizontal', rules: { 'A': [], 'BC': ['Discontinuity', '3D Model'], 'DEF': ['Discontinuity', 'Force Increase', 'Analysis Limit', '3D Model'] } },
+        { id: 'H5', name: 'Nonparallel System', category: 'Horizontal', rules: { 'AB': [], 'C': ['3D Model'], 'DEF': ['Directional', 'Analysis Limit', '3D Model'] } },
+        { id: 'V1a', name: 'Soft Story (Stiffness)', category: 'Vertical', rules: { 'ABC': [], 'DEF': ['Analysis Limit'] } },
+        { id: 'V1b', name: 'Extreme Soft Story', category: 'Vertical', rules: { 'ABC': [], 'D': ['Analysis Limit'], 'EF': ['Not Permitted'] } },
+        { id: 'V2', name: 'Weight Irregularity', category: 'Vertical', rules: { 'ABC': [], 'DEF': ['Analysis Limit'] } },
+        { id: 'V3', name: 'Vertical Geometry', category: 'Vertical', rules: { 'ABC': [], 'DEF': ['Analysis Limit'] } },
+        { id: 'V4', name: 'In-plane Discontinuity', category: 'Vertical', rules: { 'A': [], 'BC': ['Discontinuity'], 'DEF': ['Discontinuity', 'Force Increase', 'Analysis Limit'] } },
+        { id: 'V5a', name: 'Weak Story (Strength)', category: 'Vertical', rules: { 'ABC': [], 'D': ['Analysis Limit'], 'EF': ['Not Permitted'] } },
+        { id: 'V5b', name: 'Extreme Weak Story', category: 'Vertical', rules: { 'A': [], 'BC': ['Height Limit'], 'DEF': ['Not Permitted'] } }
+    ];
+
+    const sfrsData = {
+        'A': [
+            { name: 'A1. Special reinforced concrete shear walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '160', 'F': '100' } },
+            { name: 'A2. Ordinary reinforced concrete shear walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'A3. Detailed plain concrete shear walls', limits: { 'A': 'NL', 'B': 'NP', 'C': 'NP', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'A4. Ordinary plain concrete shear walls', limits: { 'A': 'NL', 'B': 'NP', 'C': 'NP', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'A7. Special steel concentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '160', 'F': '100' } },
+            { name: 'A8. Ordinary steel concentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'A9. Light-framed (wood) walls sheathed with wood structural panels', limits: { 'A': 'NL', 'B': 'NL', 'C': '65', 'D': '65', 'E': '65', 'F': '65' } },
+            { name: 'A15. Ordinary cold-formed steel intersecting strap braced walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } }
+        ],
+        'B': [
+            { name: 'B1. Steel eccentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '160', 'F': '100' } },
+            { name: 'B2. Special steel concentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '160', 'F': '100' } },
+            { name: 'B3. Ordinary steel concentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '35', 'E': '35', 'F': 'NP' } },
+            { name: 'B4. Special reinforced concrete shear walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '160', 'F': '100' } },
+            { name: 'B5. Ordinary reinforced concrete shear walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'B6. Detailed plain concrete shear walls', limits: { 'A': 'NL', 'B': 'NP', 'C': 'NP', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'B10. Composite eccentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '160', 'F': '100' } },
+            { name: 'B18. Light-framed (wood) walls sheathed with wood structural panels', limits: { 'A': 'NL', 'B': 'NL', 'C': '65', 'D': '65', 'E': '65', 'F': '65' } }
+        ],
+        'C': [
+            { name: 'C1. Special steel moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NL', 'E': 'NL', 'F': 'NL' } },
+            { name: 'C2. Special steel truss moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '100', 'F': 'NP' } },
+            { name: 'C3. Intermediate steel moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '35', 'E': 'NP', 'F': 'NP' } },
+            { name: 'C4. Ordinary steel moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'C5. Special reinforced concrete moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NL', 'E': 'NL', 'F': 'NL' } },
+            { name: 'C6. Intermediate reinforced concrete moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'C7. Ordinary reinforced concrete moment frames', limits: { 'A': 'NL', 'B': 'NP', 'C': 'NP', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'C8. Special composite steel and concrete moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NL', 'E': 'NL', 'F': 'NL' } },
+            { name: 'C9. Intermediate composite moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'C10. Composite partially restrained moment frames', limits: { 'A': '160', 'B': '160', 'C': '160', 'D': '100', 'E': 'NP', 'F': 'NP' } },
+            { name: 'C11. Ordinary composite moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NP', 'D': 'NP', 'E': 'NP', 'F': 'NP' } }
+        ],
+        'D': [
+            { name: 'D1. Steel eccentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NL', 'E': 'NL', 'F': 'NL' } },
+            { name: 'D2. Special steel concentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NL', 'E': 'NL', 'F': 'NL' } },
+            { name: 'D3. Special reinforced concrete shear walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NL', 'E': 'NL', 'F': 'NL' } },
+            { name: 'D4. Ordinary reinforced concrete shear walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } }
+        ],
+        'E': [
+            { name: 'E1. Special steel concentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '160', 'F': '100' } },
+            { name: 'E2. Special reinforced concrete shear walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '160', 'E': '160', 'F': '100' } },
+            { name: 'E3. Ordinary reinforced concrete shear walls', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } },
+            { name: 'E4. Ordinary steel concentrically braced frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': '35', 'E': 'NP', 'F': 'NP' } }
+        ],
+        'F': [
+            { name: 'F1. Ordinary reinforced concrete shear walls and ordinary RC moment frames', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NP', 'D': 'NP', 'E': 'NP', 'F': 'NP' } }
+        ],
+        'G': [
+            { name: 'G1. Special steel moment frames', limits: { 'A': '35', 'B': '35', 'C': '35', 'D': '35', 'E': '35', 'F': '35' } },
+            { name: 'G2. Special reinforced concrete moment frames', limits: { 'A': '35', 'B': '35', 'C': '35', 'D': '35', 'E': '35', 'F': '35' } },
+            { name: 'G3. Ordinary steel moment frames', limits: { 'A': '35', 'B': '35', 'C': 'NP', 'D': 'NP', 'E': 'NP', 'F': 'NP' } }
+        ],
+        'H': [
+            { name: 'H1. Structural steel systems not specifically detailed for seismic resistance', limits: { 'A': 'NL', 'B': 'NL', 'C': 'NL', 'D': 'NP', 'E': 'NP', 'F': 'NP' } }
+        ]
+    };
+
+    /* ==========================================================================
+       2. MAP INITIALIZATION & LAYER CONTROLS
+       ========================================================================== */
+    function initMap() {
+        map = L.map('map', { zoomControl: false }).setView([21.91, 95.95], 6);
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        
+        // Base Layer
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', { 
+            attribution: '&copy; Esri' 
+        }).addTo(map);
+
+        // Map Click Event (Independent from Layers)
+        map.on('click', e => processQuery(e.latlng));
+
+        setupGeoJSONLayers();
+    }
+
+    function setupGeoJSONLayers() {
+        // Create Layers with interactive: false to not intercept map clicks
+        const ssLayer = L.geoJSON(null, {
+            style: { color: "#d32f2f", weight: 1.5, fillOpacity: 0.15 },
+            interactive: false 
+        }).addTo(map); // Default ON
+
+        const s1Layer = L.geoJSON(null, {
+            style: { color: "#1a237e", weight: 1.5, fillOpacity: 0.15 },
+            interactive: false 
+        });
+
+        // Add Layer Control Widget
+        const overlayMaps = {
+            "Ss Hazard Map": ssLayer,
+            "S1 Hazard Map": s1Layer
+        };
+        L.control.layers(null, overlayMaps, { collapsed: false, position: 'topright' }).addTo(map);
+
+        // Fetch အစား JS ဖိုင်များမှ Data များကို တိုက်ရိုက်ခေါ်ယူခြင်း
+        if (typeof ssGeoDataJS !== 'undefined') {
+            ssGeoData = ssGeoDataJS; 
+            ssLayer.addData(ssGeoDataJS);
+        } else {
+            console.warn("Ss.js ဖိုင်ကို မတွေ့ပါ သို့မဟုတ် data မှားယွင်းနေပါသည်။");
+        }
+
+        if (typeof s1GeoDataJS !== 'undefined') {
+            s1GeoData = s1GeoDataJS;
+            s1Layer.addData(s1GeoDataJS);
+        } else {
+            console.warn("S1.js ဖိုင်ကို မတွေ့ပါ သို့မဟုတ် data မှားယွင်းနေပါသည်။");
+        }
+    }
+
+    /* ==========================================================================
+       3. CORE LOGIC (Interpolation & SDC Math)
+       ========================================================================== */
+    function interpolate(x, x0, x1, y0, y1) {
+        return y0 + (y1 - y0) * ((x - x0) / (x1 - x0));
+    }
+
+    function getCoefficient(val, headers, row) {
+        if (val <= headers[0]) return { res: row[0], type: 'Bound (Min)' };
+        if (val >= headers[headers.length - 1]) return { res: row[row.length - 1], type: 'Bound (Max)' };
+        
+        for (let i = 0; i < headers.length - 1; i++) {
+            if (val >= headers[i] && val <= headers[i + 1]) {
+                const x0 = headers[i], x1 = headers[i+1], y0 = row[i], y1 = row[i+1];
+                const calcRes = interpolate(val, x0, x1, y0, y1);
+                return { res: calcRes, x0, x1, y0, y1 };
+            }
+        }
+        return null;
+    }
+
+    function getSDC(sds, sd1, s1, occCat) {
+        if (s1 >= 0.75) {
+            const sdc = (occCat === 'IV') ? 'F' : (occCat === 'III' ? 'E' : 'D');
+            return { sdc, rowId: 'r-e' };
+        }
+        
+        let catSds = 'A', rowIdSds = 'r-low';
+        if (sds < 0.167) { catSds = (occCat === 'IV') ? 'B' : 'A'; rowIdSds = 'r-low'; }
+        else if (sds < 0.33) { catSds = (occCat === 'IV') ? 'C' : (occCat === 'III' ? 'B' : 'A'); rowIdSds = 'r-l'; }
+        else if (sds < 0.50) { catSds = (occCat === 'IV') ? 'D' : (occCat === 'III' ? 'C' : (occCat === 'II' ? 'B' : 'A')); rowIdSds = 'r-m'; }
+        else if (sds < 0.90) { catSds = (occCat === 'IV' || occCat === 'III') ? 'D' : (occCat === 'II' ? 'C' : 'B'); rowIdSds = 'r-h'; }
+        else { catSds = (occCat === 'I' ? 'C' : 'D'); rowIdSds = 'r-s'; }
+
+        let catSd1 = 'A', rowIdSd1 = 'r-low';
+        if (sd1 < 0.067) { catSd1 = (occCat === 'IV') ? 'B' : 'A'; rowIdSd1 = 'r-low'; }
+        else if (sd1 < 0.133) { catSd1 = (occCat === 'IV') ? 'C' : (occCat === 'III' ? 'B' : 'A'); rowIdSd1 = 'r-l'; }
+        else if (sd1 < 0.20) { catSd1 = (occCat === 'IV') ? 'D' : (occCat === 'III' ? 'C' : (occCat === 'II' ? 'B' : 'A')); rowIdSd1 = 'r-m'; }
+        else if (sd1 < 0.50) { catSd1 = (occCat === 'IV' || occCat === 'III') ? 'D' : (occCat === 'II' ? 'C' : 'B'); rowIdSd1 = 'r-h'; }
+        else { catSd1 = (occCat === 'I' ? 'C' : 'D'); rowIdSd1 = 'r-s'; }
+
+        if (catSds >= catSd1) return { sdc: catSds, rowId: rowIdSds };
+        return { sdc: catSd1, rowId: rowIdSd1 };
+    }
+
+    /* ==========================================================================
+       4. UI UPDATES & INTERACTION
+       ========================================================================== */
+    function setSDCDisplay(cat) {
+        const sdcElement = document.getElementById('sdc-val');
+        sdcElement.innerText = cat;
+        
+        if (cat === "--" || cat === "N/A") {
+            sdcElement.style.background = "#e0e0e0";
+            sdcElement.style.color = "#333";
+            return;
+        }
+
+        switch(cat) {
+            case 'A': sdcElement.style.background = "#4caf50"; sdcElement.style.color="#fff"; break;
+            case 'B': sdcElement.style.background = "#8bc34a"; sdcElement.style.color="#fff"; break;
+            case 'C': sdcElement.style.background = "#ffeb3b"; sdcElement.style.color="#333"; break;
+            case 'D': sdcElement.style.background = "#ff9800"; sdcElement.style.color="#fff"; break;
+            case 'E': sdcElement.style.background = "#e64a19"; sdcElement.style.color="#fff"; break;
+            case 'F': sdcElement.style.background = "#b71c1c"; sdcElement.style.color="#fff"; break;
+            default:  sdcElement.style.background = "#ccc"; sdcElement.style.color="#333";
+        }
+    }
+
+    function updateCalculations() {
+        const siteClass = document.getElementById('site-class').value;
+        const occCat = document.getElementById('occ-cat').value;
+        const alertBox = document.getElementById('class-f-alert');
+
+        document.getElementById('ie-label').innerText = "(I=" + importanceFactors[occCat].toFixed(1) + ")";
+
+        // Check for Class F
+        if (siteClass === 'F') {
+            document.getElementById('fa-val').innerText = "N/A";
+            document.getElementById('fv-val').innerText = "N/A";
+            document.getElementById('sds-val').innerText = "N/A";
+            document.getElementById('sd1-val').innerText = "N/A";
+            setSDCDisplay("N/A");
+            alertBox.style.display = "block";
+            updateSfrsUI();
+            return;
+        } else {
+            alertBox.style.display = "none";
+        }
+
+        // Need valid Ss/S1 data to calculate
+        if (currentSs === null || currentS1 === null) return;
+
+        const faRes = getCoefficient(currentSs, faHeaders, faData[siteClass]);
+        const fvRes = getCoefficient(currentS1, fvHeaders, fvData[siteClass]);
+
+        if (faRes && fvRes) {
+            document.getElementById('fa-val').innerText = faRes.res.toFixed(3);
+            document.getElementById('fv-val').innerText = fvRes.res.toFixed(3);
+
+            const sds = (2/3) * faRes.res * currentSs;
+            const sd1 = (2/3) * fvRes.res * currentS1;
+            
+            document.getElementById('sds-val').innerText = sds.toFixed(3);
+            document.getElementById('sd1-val').innerText = sd1.toFixed(3);
+
+            const sdcObj = getSDC(sds, sd1, currentS1, occCat);
+            setSDCDisplay(sdcObj.sdc);
+            document.getElementById('sdcSelect').value = sdcObj.sdc;
+            updateSfrsUI(sdcObj.sdc);
+            
+            // Save state for PDF Report verification trace
+            window.lastFa = faRes;
+            window.lastFv = fvRes;
+            window.lastSdcRow = sdcObj.rowId;
+        }
+    }
+
+    function updateSfrsUI(sdcVal) {
+        const currentSDC = sdcVal || document.getElementById('sdc-val').innerText;
+        const currentSFRS = document.getElementById('sfrsSelect').value;
+        
+        // 1. Structural Irregularities
+        const irrBody = document.getElementById('irregularitiesBody');
+        irrBody.innerHTML = '';
+        let activeIrrCount = 0;
+
+        irregularitiesData.forEach(item => {
+            const issues = getIrregularityIssues(currentSDC, item.rules);
+            if (issues.length > 0) {
+                activeIrrCount++;
+                const tags = issues.map(issue => issue === 'Not Permitted' ? `<span class="issue-tag fatal"><i>Not Permitted</i></span>` : `<span class="issue-tag"><b>${issue}</b></span>`);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td><strong>${item.id}</strong> - ${item.name}</td><td><div class="issue-tags">${tags.join('')}</div></td>`;
+                irrBody.appendChild(tr);
+            }
+        });
+
+        if(activeIrrCount === 0) {
+            irrBody.innerHTML = `<tr><td colspan="2" class="no-issues">No irregularities trigger penalties.</td></tr>`;
+        }
+
+        // 2. SFRS Limitations
+        const sfrsBody = document.getElementById('sfrsTableBody');
+        sfrsBody.innerHTML = '';
+        if (currentSDC === '--' || currentSDC === 'N/A') return;
+
+        const systems = sfrsData[currentSFRS];
+        if (systems) {
+            systems.forEach(sys => {
+                const limitVal = sys.limits[currentSDC];
+                const limitHtml = limitVal === 'NL' ? '<span class="status-permitted">No Limit</span>' : (limitVal === 'NP' ? '<span class="status-not-permitted">NP</span>' : `<span class="status-penalties">${limitVal} ft</span>`);
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${sys.name}</td><td>${limitHtml}</td>`;
+                sfrsBody.appendChild(tr);
+            });
+        }
+    }
+
+    function getIrregularityIssues(sdc, rules) {
+        for (const [key, issues] of Object.entries(rules)) {
+            if (key.includes(sdc)) return issues;
+        }
+        return []; 
+    }
+
+   function processQuery(latlng) {
+        currentLatLng = latlng;
+        const pt = turf.point([latlng.lng, latlng.lat]);
+        let foundSs = 0.0;
+        let foundS1 = 0.0; 
+        
+       
+        if(ssGeoData) turf.featureEach(ssGeoData, f => { 
+            if(turf.booleanPointInPolygon(pt, f)) foundSs = f.properties.ss || f.properties.Ss; 
+        });
+        if(s1GeoData) turf.featureEach(s1GeoData, f => { 
+            if(turf.booleanPointInPolygon(pt, f)) foundS1 = f.properties.s1 || f.properties.S1; 
+        });
+
+        currentSs = foundSs; 
+        currentS1 = foundS1;
+
+        // Update Location UI
+        document.getElementById('lat').innerText = latlng.lat.toFixed(5);
+        document.getElementById('lng').innerText = latlng.lng.toFixed(5);
+        document.getElementById('ss-val').innerText = foundSs;
+        document.getElementById('s1-val').innerText = foundS1;
+
+        // Update Map Marker
+        if (currentMarker) map.removeLayer(currentMarker);
+        currentMarker = L.marker(latlng).addTo(map).bindPopup(`Ss: ${foundSs}g | S1: ${foundS1}g`).openPopup();
+
+        // Trigger chain
+        updateCalculations();
+    }
+    function searchLocation() {
+        const input = document.getElementById('search-coords').value;
+        const parts = input.split(',').map(s => parseFloat(s.trim()));
+        if(parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            const latlng = { lat: parts[0], lng: parts[1] };
+            map.setView(latlng, 10);
+            processQuery(latlng);
+        } else {
+            alert("Please enter valid coordinates: lat, lng");
+        }
+    }
+
+    /* ==========================================================================
+       5. PRINT REPORT GENERATION (PDF)
+       ========================================================================== */
+    function generateReport() {
+        if (currentSs === null) {
+            alert("Please select a location on the map first.");
+            return;
+        }
+
+        // Transfer basic details
+        document.getElementById('p-lat').innerText = document.getElementById('lat').innerText;
+        document.getElementById('p-lng').innerText = document.getElementById('lng').innerText;
+        document.getElementById('p-class').innerText = document.getElementById('site-class').value;
+        document.getElementById('p-occ').innerText = document.getElementById('occ-cat').value;
+        document.getElementById('p-ss').innerText = currentSs + " g";
+        document.getElementById('p-s1').innerText = currentS1 + " g";
+        document.getElementById('p-fa').innerText = document.getElementById('fa-val').innerText;
+        document.getElementById('p-fv').innerText = document.getElementById('fv-val').innerText;
+        document.getElementById('p-sds').innerText = document.getElementById('sds-val').innerText + " g";
+        document.getElementById('p-sd1').innerText = document.getElementById('sd1-val').innerText + " g";
+        
+        // Transfer SDC and Colors
+        const sdcVal = document.getElementById('sdc-val').innerText;
+        const pSdc = document.getElementById('p-sdc');
+        pSdc.innerText = sdcVal;
+        
+        switch(sdcVal) {
+            case 'A': pSdc.style.background = "#4caf50"; pSdc.style.color = "#fff"; break;
+            case 'B': pSdc.style.background = "#8bc34a"; pSdc.style.color = "#fff"; break;
+            case 'C': pSdc.style.background = "#ffeb3b"; pSdc.style.color = "#333"; break;
+            case 'D': pSdc.style.background = "#ff9800"; pSdc.style.color = "#fff"; break;
+            case 'E': pSdc.style.background = "#e64a19"; pSdc.style.color = "#fff"; break;
+            case 'F': pSdc.style.background = "#b71c1c"; pSdc.style.color = "#fff"; break;
+            default:  pSdc.style.background = "#ccc"; pSdc.style.color = "#333";
+        }
+
+        // Transfer SFRS & Irregularities
+        const sfrsSelect = document.getElementById('sfrsSelect');
+        document.getElementById('p-sfrs').innerText = sfrsSelect.options[sfrsSelect.selectedIndex].text;
+        document.getElementById('p-irregularitiesBody').innerHTML = document.getElementById('irregularitiesBody').innerHTML;
+        document.getElementById('p-sfrsTableBody').innerHTML = document.getElementById('sfrsTableBody').innerHTML;
+
+        // Math Traces
+        const fa = window.lastFa || {};
+        document.getElementById('fa-step').innerHTML = fa.x0 
+            ? `<b>Interpolating Fa:</b> Ss is ${currentSs}. Bound points [${fa.x0}, ${fa.x1}] with values [${fa.y0}, ${fa.y1}]. <br>Fa = ${fa.y0} + (${fa.y1} - ${fa.y0}) * ((${currentSs} - ${fa.x0}) / (${fa.x1} - ${fa.x0})) = <b>${fa.res.toFixed(3)}</b>` 
+            : `<b>Fa Selection:</b> ${fa.type} = ${fa.res}`;
+        
+        const fv = window.lastFv || {};
+        document.getElementById('fv-step').innerHTML = fv.x0 
+            ? `<b>Interpolating Fv:</b> S1 is ${currentS1}. Bound points [${fv.x0}, ${fv.x1}] with values [${fv.y0}, ${fv.y1}]. <br>Fv = ${fv.y0} + (${fv.y1} - ${fv.y0}) * ((${currentS1} - ${fv.x0}) / (${fv.x1} - ${fv.x0})) = <b>${fv.res.toFixed(3)}</b>` 
+            : `<b>Fv Selection:</b> ${fv.type} = ${fv.res}`;
+
+        // Update Reference Table Highlight
+        document.querySelectorAll('#ref-table-body tr').forEach(r => r.classList.remove('highlight-row'));
+        if(window.lastSdcRow) {
+            const rowElem = document.getElementById(window.lastSdcRow);
+            if(rowElem) rowElem.classList.add('highlight-row');
+        }
+
+        document.getElementById('print-footer-time').innerText = "Generated: " + new Date().toLocaleString();
+        
+        // Trigger print dialog
+        window.print();
+    }
+
+    // --- INITIALIZE APPLICATION ---
+    initMap();
+    updateSfrsUI("--");
+
+</script>
+</body>
+</html>
